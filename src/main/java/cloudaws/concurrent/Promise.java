@@ -41,7 +41,7 @@ public class Promise<T> extends CompletableFuture<T> {
 				FutureUtil.enqueue(this::loop);
 			}
 			else {
-				completeExceptionally(new TimeoutException("Future timeout: " + future));
+				completeExceptionally(new TimeoutException("Future timed out: " + future));
 			}
 		}
 	}

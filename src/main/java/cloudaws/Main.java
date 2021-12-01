@@ -1,12 +1,12 @@
 package cloudaws;
 
 import cloudaws.concurrent.FutureUtil;
+import cloudaws.ec2.EC2Manager;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
 public class Main {
-
 	private static final ScheduledExecutorService PROMISE_POOL = Executors.newSingleThreadScheduledExecutor();
 	private static final EC2Manager EC2 = EC2Manager.INSTANCE;
 
