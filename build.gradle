@@ -1,6 +1,9 @@
 plugins {
     id 'java'
     id 'application'
+    id 'idea'
+
+    id 'com.github.johnrengelman.shadow' version '7.1.0'
 }
 repositories {
     mavenCentral()
@@ -11,19 +14,26 @@ compileJava.options.encoding = 'UTF-8'
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
 
+version = '0.1'
+mainClassName = 'cloudaws.Main'
+
 sourceSets {
     main {
         java { srcDir 'src/main/java' }
     }
 }
+shadowJar {
+    zip64 = true
+}
 jar {
+    finalizedBy shadowJar
     manifest {
         attributes 'Main-Class': 'cloudaws.Main'
     }
 }
-
-version = '0.1'
-mainClassName = 'cloudaws.Main'
+test {
+    useJUnitPlatform()
+}
 
 dependencies {
     implementation 'com.amazonaws:aws-java-sdk:1.12.111'
@@ -38,7 +48,12 @@ dependencies {
     implementation 'org.apache.httpcomponents:httpclient-win:4.5.13'
     implementation 'org.apache.httpcomponents:httpmime:4.5.13'
 
-    implementation "com.fasterxml.jackson.core:jackson-core:2.12.5"
-    implementation "com.fasterxml.jackson.core:jackson-annotations:2.12.5"
-    implementation "com.fasterxml.jackson.core:jackson-databind:2.12.5"
+    implementation 'com.fasterxml.jackson.core:jackson-core:2.12.5'
+    implementation 'com.fasterxml.jackson.core:jackson-annotations:2.12.5'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.12.5'
+
+    implementation 'com.googlecode.lanterna:lanterna:3.1.1'
+
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.1'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
 }
