@@ -27,8 +27,8 @@ public class MainScreen {
 		}
 	}
 
-	public void loadMenu() {
-		gui.addWindowAndWait(new MainMenu());
+	public void show() {
+		gui.addWindowAndWait(new MainMenu("Menus"));
 	}
 
 	public void collapse() {

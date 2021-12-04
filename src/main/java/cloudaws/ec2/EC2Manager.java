@@ -72,6 +72,17 @@ public class EC2Manager {
 		});
 	}
 
+	public CompletableFuture<Instance> getInstance(String instanceId) {
+		assertInit();
+		DescribeInstancesRequest req = new DescribeInstancesRequest().withInstanceIds(instanceId);
+		return new Promise<>(client.describeInstancesAsync(req)).thenApply(result -> {
+			if (result.getReservations().size() != 0) return null;
+			if (result.getReservations().get(0).getInstances().size() != 0) return null;
+
+			return result.getReservations().get(0).getInstances().get(0);
+		});
+	}
+
 	public void startInstance(String instanceId) {
 		assertInit();
 		StartInstancesRequest req = new StartInstancesRequest().withInstanceIds(instanceId);
