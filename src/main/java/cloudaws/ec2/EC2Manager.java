@@ -6,7 +6,7 @@ import com.amazonaws.regions.Regions;
 import com.amazonaws.services.ec2.AmazonEC2Async;
 import com.amazonaws.services.ec2.AmazonEC2AsyncClientBuilder;
 import com.amazonaws.services.ec2.model.*;
-
+import com.amazonaws.services.s3.model.Owner;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -20,7 +20,7 @@ public class EC2Manager {
 	private static final Log logger = LogFactory.getLog(EC2Manager.class);
 
 	private AmazonEC2AsyncClientBuilder builder;
-	private AmazonEC2Async client;
+	public AmazonEC2Async client;
 
 	private EC2Manager() {
 		this(null,null);
@@ -104,18 +104,34 @@ public class EC2Manager {
 	// Zones & Regions
 	public CompletableFuture<List<AvailabilityZone>> avaliableZones() {
 		assertInit();
-		return new Promise<>(client.describeAvailabilityZonesAsync()).thenApply(res -> res.getAvailabilityZones());
+		return new Promise<>(client.describeAvailabilityZonesAsync()).thenApply(DescribeAvailabilityZonesResult::getAvailabilityZones);
 	}
 
 	public CompletableFuture<List<Region>> availableRegions() {
 		assertInit();
-		return new Promise<>(client.describeRegionsAsync()).thenApply(res -> res.getRegions());
+		return new Promise<>(client.describeRegionsAsync()).thenApply(DescribeRegionsResult::getRegions);
 	}
 
 	// Image management
 	public CompletableFuture<List<Image>> getImages() {
 		assertInit();
-		return new Promise<>(client.describeImagesAsync()).thenApply(res -> res.getImages());
+		DescribeImagesRequest req = new DescribeImagesRequest();
+		req.withFilters(
+				new Filter().withName("is-public").withValues("false")
+		);
+
+		return new Promise<>(client.describeImagesAsync(req)).thenApply(DescribeImagesResult::getImages);
+	}
+
+	// Keys & Security
+	public CompletableFuture<List<KeyPairInfo>> getKeyPairs() {
+		assertInit();
+		return new Promise<>(client.describeKeyPairsAsync()).thenApply(DescribeKeyPairsResult::getKeyPairs);
+	}
+
+	public CompletableFuture<List<SecurityGroup>> getSecurityGroups() {
+		assertInit();
+		return new Promise<>(client.describeSecurityGroupsAsync()).thenApply(DescribeSecurityGroupsResult::getSecurityGroups);
 	}
 
 	public void terminate() {

@@ -3,9 +3,11 @@ package cloudaws.ui.windows.ec2;
 import cloudaws.Main;
 import cloudaws.concurrent.Binding;
 import cloudaws.ec2.EC2Util;
-import cloudaws.ui.windows.WindowConstruction;
+import cloudaws.ui.windows.PendingWindow;
+
 import com.amazonaws.services.ec2.model.Instance;
 import com.amazonaws.services.ec2.model.InstanceState;
+
 import com.googlecode.lanterna.SGR;
 import com.googlecode.lanterna.TerminalSize;
 import com.googlecode.lanterna.TextColor;
@@ -16,77 +18,30 @@ import com.googlecode.lanterna.gui2.dialogs.MessageDialogButton;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-public class InstanceList extends WindowConstruction {
+public class InstanceList extends PendingWindow {
 
 	private static final String DEFAULT_TITLE = "Instances";
-
-	private static final int DEFAULT_WIDTH = 50;
 	private static final int DEFAULT_HEIGHT = 10;
-	private static final int RELOAD_DELAY = 1000;
 
 	private CompletableFuture<List<Instance>> future;
 	private final Binding<List<Instance>> instances;
 	private String lastFocusd = "";
 
-	private Panel panel, pending;
-	private Button closeButton;
-
 	public InstanceList() { this(""); }
 
 	public InstanceList(String title) {
 		super(title);
-		this.instances = new Binding<>(Main.EC2::getInstances, this::fail, RELOAD_DELAY)
+		this.instances = new Binding<>(Main.EC2::getInstances, this::fail)
 				.withDefault(Collections.emptyList())
 				.withNotifier(this, this::updateInstances);
 		this.instances.start();
 	}
 
 	@Override
-	protected void buildComponents() {
-		this.setHints(Collections.singletonList(Hint.CENTERED));
-
-		panel = new Panel();
-		panel.setLayoutManager(
-				new GridLayout(1)
-						.setLeftMarginSize(2)
-						.setRightMarginSize(2)
-		);
-
-		pending = new Panel();
-		pending.setPreferredSize(new TerminalSize(DEFAULT_WIDTH, 3));
-		pending.setLayoutManager(new GridLayout(1));
-
-		AnimatedLabel pendingLabel = new AnimatedLabel("- Loading -");
-		char[] rotation = { '\\', '|', '/' };
-		for (char c : rotation) {
-			pendingLabel.addFrame(String.format("%c Loading %c", c, c));
-		}
-		pendingLabel.startAnimation(200);
-
-		pendingLabel.setLayoutData(GridLayout.createLayoutData(
-				GridLayout.Alignment.CENTER,
-				GridLayout.Alignment.CENTER,
-				true,
-				true
-		)).addTo(pending);
-		panel.addComponent(pending);
-
-		closeButton = new Button(LocalizedString.Close.toString(), this::cancel)
-				.setLayoutData(GridLayout.createLayoutData(
-						GridLayout.Alignment.CENTER,
-						GridLayout.Alignment.CENTER,
-						true,
-						false
-				));
-
-		panel.addComponent(closeButton);
-
-		this.setComponent(panel);
-	}
-
-	private void cancel() {
+	protected void cancel() {
 		if (future != null) {
 			future.cancel(true);
 			future = null;
@@ -99,12 +54,34 @@ public class InstanceList extends WindowConstruction {
 		this.close();
 	}
 
-	private void updateInstances(List<Instance> instances) {
+	private void updateInstances(List<Instance> rawResult) {
 		if (!getTitle().equals(DEFAULT_TITLE)) this.setTitle(DEFAULT_TITLE);
 		panel.removeAllComponents();
 
-		if (instances != null && instances.size() > 0) {
-			ActionListBox pool = new ActionListBox(new TerminalSize(DEFAULT_WIDTH, Math.min(instances.size(), DEFAULT_HEIGHT)));
+		List<Instance> instances = rawResult != null ? rawResult.stream()
+				.filter(instance -> {
+					int code = instance.getState().getCode();
+					// Filtering terminated instances
+					return code != 32 && code != 48;
+				})
+				.collect(Collectors.toList()) : Collections.emptyList();
+
+		if (instances.size() > 0) {
+			String[] zoneInfo = instances.get(0).getPlacement().getAvailabilityZone().split("-");
+			if (zoneInfo.length > 2) {
+				String region = String.format("[%s-%s]", zoneInfo[0], zoneInfo[1]);
+				panel.addComponent(new Label(region).addStyle(SGR.BOLD).setLayoutData(
+						GridLayout.createLayoutData(
+								GridLayout.Alignment.CENTER,
+								GridLayout.Alignment.CENTER,
+								true,
+								false
+						)
+				));
+				panel.addComponent(new EmptySpace(TerminalSize.ONE));
+			}
+
+			ActionListBox pool = new ActionListBox(new TerminalSize(DEFAULT_WIDTH, Math.min(instances.size() + 1, DEFAULT_HEIGHT)));
 			instances.forEach(instance -> {
 				String name = EC2Util.getInstanceName(instance), field;
 				if (!name.equals("")) {
@@ -135,6 +112,7 @@ public class InstanceList extends WindowConstruction {
 					this.updateInstances(this.instances.get());
 				});
 			});
+			pool.addItem("<Create a new instance>", this::createInstance);
 
 			panel.addComponent(pool);
 			pool.takeFocus();
@@ -151,7 +129,25 @@ public class InstanceList extends WindowConstruction {
 			}
 		}
 		else {
-			panel.addComponent(new Label("There is no available instance."));
+			panel.addComponent(new Label("There is no available instance.")
+					.setPreferredSize(new TerminalSize(DEFAULT_WIDTH, 2))
+					.setLayoutData(GridLayout.createLayoutData(
+							GridLayout.Alignment.CENTER,
+							GridLayout.Alignment.END,
+							true,
+							true
+					))
+			);
+
+			Button newInstance = new Button("Create a new instance", this::createInstance);
+			newInstance.setLayoutData(GridLayout.createLayoutData(
+					GridLayout.Alignment.CENTER,
+					GridLayout.Alignment.CENTER,
+					true,
+					false
+				)
+			);
+			panel.addComponent(newInstance);
 		}
 
 		panel.addComponent(new EmptySpace(TerminalSize.ONE));
@@ -159,6 +155,22 @@ public class InstanceList extends WindowConstruction {
 
 		// Run only once.
 		this.instances.pause(this);
+		this.invalidate();
+	}
+
+	private void createInstance() {
+		InstanceCreation creation = new InstanceCreation();
+		getTextGUI().addWindowAndWait(creation);
+
+		if (creation.isRequested()) {
+			panel.removeAllComponents();
+			this.setTitle("");
+			this.lastFocusd = "";
+
+			buildComponents();
+
+			this.instances.resume(this);
+		}
 	}
 
 	private boolean fail(Throwable error) {

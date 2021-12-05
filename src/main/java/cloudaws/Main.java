@@ -1,6 +1,5 @@
 package cloudaws;
 
-import cloudaws.concurrent.FutureUtil;
 import cloudaws.ec2.EC2Manager;
 import cloudaws.ui.MainScreen;
 

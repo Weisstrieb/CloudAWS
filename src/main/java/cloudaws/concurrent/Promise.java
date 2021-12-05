@@ -12,7 +12,7 @@ public class Promise<T> extends CompletableFuture<T> {
 	private final long timeout;
 
 	public Promise(Future<T> future) {
-		this(future, 5000);
+		this(future, 10000);
 	}
 
 	public Promise(Future<T> future, long timeout) {
@@ -29,6 +29,7 @@ public class Promise<T> extends CompletableFuture<T> {
 				complete(future.get());
 			} catch (InterruptedException e) {
 				completeExceptionally(e);
+
 			} catch (ExecutionException e) {
 				completeExceptionally(e.getCause());
 			}

@@ -7,12 +7,12 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 public class Binding<T> {
 	private static final ScheduledExecutorService SERVICE = Main.BINDING_POOL;
+	private static final long DEFAULT_RELOAD_DELAY = 1000;
 
 	private T data;
 	private T defaultValue = null;
@@ -25,6 +25,14 @@ public class Binding<T> {
 
 	private long period;
 	private boolean stopped = false;
+
+	public Binding(Supplier<CompletableFuture<T>> provider) {
+		this(provider, null, DEFAULT_RELOAD_DELAY);
+	}
+
+	public Binding(Supplier<CompletableFuture<T>> provider, Predicate<Throwable> failure) {
+		this(provider, failure, DEFAULT_RELOAD_DELAY);
+	}
 
 	public Binding(Supplier<CompletableFuture<T>> provider, long period) {
 		this(provider, null, period);
