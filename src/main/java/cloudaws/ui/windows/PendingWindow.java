@@ -69,5 +69,7 @@ public abstract class PendingWindow extends WindowConstruction {
 		this.setComponent(panel);
 	}
 
-	protected abstract void cancel();
+	protected void cancel() {
+		this.close();
+	};
 }

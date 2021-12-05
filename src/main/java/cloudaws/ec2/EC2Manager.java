@@ -6,7 +6,6 @@ import com.amazonaws.regions.Regions;
 import com.amazonaws.services.ec2.AmazonEC2Async;
 import com.amazonaws.services.ec2.AmazonEC2AsyncClientBuilder;
 import com.amazonaws.services.ec2.model.*;
-import com.amazonaws.services.s3.model.Owner;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -16,8 +15,10 @@ import java.util.concurrent.CompletableFuture;
 
 public class EC2Manager {
 
-	public static final EC2Manager INSTANCE = new EC2Manager();
+	public static EC2Manager INSTANCE = new EC2Manager();
 	private static final Log logger = LogFactory.getLog(EC2Manager.class);
+
+	private String currentRegion = Regions.US_EAST_2.getName();
 
 	private AmazonEC2AsyncClientBuilder builder;
 	public AmazonEC2Async client;
@@ -31,6 +32,7 @@ public class EC2Manager {
 				.withCredentials(new ProfileCredentialsProvider(profile));
 		if (region != null) {
 			builder = builder.withRegion(region);
+			this.currentRegion = region.getName();
 		}
 	}
 
@@ -55,6 +57,17 @@ public class EC2Manager {
 	public CompletableFuture<Instance> createInstance(RunInstancesRequest req) {
 		assertInit();
 		return new Promise<>(client.runInstancesAsync(req)).thenApply(result -> result.getReservation().getInstances().get(0));
+	}
+
+	public String getCurrentRegion() {
+		return this.currentRegion;
+	}
+
+	public void changeRegion(Regions region) {
+		INSTANCE.terminate();
+
+		INSTANCE = new EC2Manager(null, region);
+		INSTANCE.init();
 	}
 
 	public CompletableFuture<List<Instance>> getInstances() {

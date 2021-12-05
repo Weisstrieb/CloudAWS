@@ -12,13 +12,15 @@ public class Main {
 	public static final ScheduledExecutorService PROMISE_POOL = Executors.newSingleThreadScheduledExecutor();
 	public static final ScheduledExecutorService BINDING_POOL = Executors.newSingleThreadScheduledExecutor();
 
-	public static final EC2Manager EC2 = EC2Manager.INSTANCE;
+	public static EC2Manager EC2() {
+		return EC2Manager.INSTANCE;
+	}
 
 	private static MainScreen screen;
 
 	public static void initialize() {
 		Runtime.getRuntime().addShutdownHook(new Thread(Main::terminate, "TERM_HOOK"));
-		EC2.init();
+		EC2().init();
 		terminated = false;
 
 		screen = new MainScreen();
@@ -26,7 +28,7 @@ public class Main {
 
 	public static void terminate() {
 		if (!terminated) {
-			EC2.terminate();
+			EC2().terminate();
 			PROMISE_POOL.shutdown();
 			BINDING_POOL.shutdown();
 

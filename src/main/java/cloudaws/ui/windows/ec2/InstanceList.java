@@ -34,7 +34,7 @@ public class InstanceList extends PendingWindow {
 
 	public InstanceList(String title) {
 		super(title);
-		this.instances = new Binding<>(Main.EC2::getInstances, this::fail)
+		this.instances = new Binding<>(Main.EC2()::getInstances, this::fail)
 				.withDefault(Collections.emptyList())
 				.withNotifier(this, this::updateInstances);
 		this.instances.start();
@@ -58,29 +58,40 @@ public class InstanceList extends PendingWindow {
 		if (!getTitle().equals(DEFAULT_TITLE)) this.setTitle(DEFAULT_TITLE);
 		panel.removeAllComponents();
 
-		List<Instance> instances = rawResult != null ? rawResult.stream()
+		List<Instance> instances = new ArrayList<>(rawResult != null ? rawResult.stream()
 				.filter(instance -> {
 					int code = instance.getState().getCode();
 					// Filtering terminated instances
 					return code != 32 && code != 48;
 				})
-				.collect(Collectors.toList()) : Collections.emptyList();
+				.collect(Collectors.toList()) : Collections.emptyList()
+		);
+		instances.sort((i1, i2) -> {
+			String n1 = EC2Util.getInstanceName(i1), n2 = EC2Util.getInstanceName(i2);
+			if (n1.equals("") == n2.equals("")) {
+				return n1.compareTo(n2);
+			}
+			else {
+				return n2.length() - n1.length();
+			}
+		});
+
+		String[] zoneInfo = (instances.size() > 0) ?
+				instances.get(0).getPlacement().getAvailabilityZone().split("-") :
+				Main.EC2().getCurrentRegion().split("-");
+		String region = String.format("[%s-%s]", zoneInfo[0], zoneInfo[1]);
+
+		panel.addComponent(new Label(region).addStyle(SGR.BOLD).setLayoutData(
+				GridLayout.createLayoutData(
+						GridLayout.Alignment.CENTER,
+						GridLayout.Alignment.CENTER,
+						true,
+						false
+				)
+		));
+		panel.addComponent(new EmptySpace(TerminalSize.ONE));
 
 		if (instances.size() > 0) {
-			String[] zoneInfo = instances.get(0).getPlacement().getAvailabilityZone().split("-");
-			if (zoneInfo.length > 2) {
-				String region = String.format("[%s-%s]", zoneInfo[0], zoneInfo[1]);
-				panel.addComponent(new Label(region).addStyle(SGR.BOLD).setLayoutData(
-						GridLayout.createLayoutData(
-								GridLayout.Alignment.CENTER,
-								GridLayout.Alignment.CENTER,
-								true,
-								false
-						)
-				));
-				panel.addComponent(new EmptySpace(TerminalSize.ONE));
-			}
-
 			ActionListBox pool = new ActionListBox(new TerminalSize(DEFAULT_WIDTH, Math.min(instances.size() + 1, DEFAULT_HEIGHT)));
 			instances.forEach(instance -> {
 				String name = EC2Util.getInstanceName(instance), field;
@@ -338,7 +349,7 @@ public class InstanceList extends PendingWindow {
 						.showDialog(getTextGUI());
 
 				if (answer == MessageDialogButton.Yes)
-					Main.EC2.startInstance(instance.getInstanceId());
+					Main.EC2().startInstance(instance.getInstanceId());
 			});
 			Button stop = factory.apply("Stop", () -> {
 				if (this.instance.getState().getCode() != 16) return;
@@ -348,7 +359,7 @@ public class InstanceList extends PendingWindow {
 						.showDialog(getTextGUI());
 
 				if (answer == MessageDialogButton.Yes)
-					Main.EC2.stopInstance(instance.getInstanceId());
+					Main.EC2().stopInstance(instance.getInstanceId());
 			});
 			Button reboot = factory.apply("Reboot", () -> {
 				if (this.instance.getState().getCode() != 16) return;
@@ -358,7 +369,7 @@ public class InstanceList extends PendingWindow {
 						.showDialog(getTextGUI());
 
 				if (answer == MessageDialogButton.Yes)
-					Main.EC2.rebootInstance(instance.getInstanceId());
+					Main.EC2().rebootInstance(instance.getInstanceId());
 			});
 
 			panel.addComponent(start);

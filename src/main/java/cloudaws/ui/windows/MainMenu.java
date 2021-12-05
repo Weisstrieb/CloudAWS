@@ -1,12 +1,11 @@
 package cloudaws.ui.windows;
 
+import cloudaws.ui.windows.ec2.ChangeRegion;
 import cloudaws.ui.windows.ec2.InstanceList;
 import com.googlecode.lanterna.TerminalSize;
 import com.googlecode.lanterna.gui2.*;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 public class MainMenu extends WindowConstruction {
 	public MainMenu(String title) {
@@ -51,12 +50,20 @@ public class MainMenu extends WindowConstruction {
 	}
 
 	private Map<String, Runnable> supplyMenus() {
-		HashMap<String, Runnable> menus = new HashMap<>();
+		Map<String, Runnable> menus = new LinkedHashMap<>();
 
 		menus.put("Instance Management", () -> {
 			InstanceList list = new InstanceList();
 			getTextGUI().addWindowAndWait(list);
 		});
+
+		menus.put("Regions", () -> {
+			getTextGUI().addWindowAndWait(new ChangeRegion());
+		});
+
+		// menus.put("Security Group", () -> {});
+
+		menus.put("HTCondor Status", () -> {});
 
 		return menus;
 	}

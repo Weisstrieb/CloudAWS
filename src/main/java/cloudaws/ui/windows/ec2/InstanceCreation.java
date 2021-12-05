@@ -40,12 +40,12 @@ public class InstanceCreation extends PendingWindow {
 	}
 
 	private void prepareOptions() {
-		CompletableFuture<Void> images = Main.EC2.getImages().thenAccept(res -> this.aImages = res);
-		CompletableFuture<Void> zones = Main.EC2.avaliableZones().thenAccept(res -> this.aZones = res);
-		CompletableFuture<Void> keys = Main.EC2.getKeyPairs().thenAccept(res ->
+		CompletableFuture<Void> images = Main.EC2().getImages().thenAccept(res -> this.aImages = res);
+		CompletableFuture<Void> zones = Main.EC2().avaliableZones().thenAccept(res -> this.aZones = res);
+		CompletableFuture<Void> keys = Main.EC2().getKeyPairs().thenAccept(res ->
 				this.aKeys = res.stream().map(KeyPairInfo::getKeyName).collect(Collectors.toList())
 		);
-		CompletableFuture<Void> groups = Main.EC2.getSecurityGroups().thenAccept(res ->
+		CompletableFuture<Void> groups = Main.EC2().getSecurityGroups().thenAccept(res ->
 				this.aSecurityGroups = res
 		);
 
@@ -132,7 +132,7 @@ public class InstanceCreation extends PendingWindow {
 						.withKeyName(cKeys.getSelectedItem())
 						.withSecurityGroupIds(aSecurityGroups.get(cGroups.getSelectedIndex()).getGroupId());
 
-				Main.EC2.createInstance(request);
+				Main.EC2().createInstance(request);
 				requested = true;
 				this.close();
 			}
