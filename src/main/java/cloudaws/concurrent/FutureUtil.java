@@ -1,10 +1,12 @@
 package cloudaws.concurrent;
 
+import cloudaws.Main;
+
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 public class FutureUtil {
-	static ScheduledExecutorService SERVICE;
+	static final ScheduledExecutorService SERVICE = Main.PROMISE_POOL;
 	static long ENQUEUE_DELAY = 1;
 
 	static void enqueue(Runnable r) {
@@ -13,17 +15,5 @@ public class FutureUtil {
 
 	static void enqueue(Runnable r, TimeUnit unit) {
 		if (SERVICE != null) SERVICE.schedule(r, ENQUEUE_DELAY, unit);
-	}
-
-	public static void provide(ScheduledExecutorService service, long delay) {
-		ENQUEUE_DELAY = Math.max(1, delay);
-		if (service != null) SERVICE = service;
-		else {
-			throw new NullPointerException("The providing service cannot be null.");
-		}
-	}
-
-	public static void terminate() {
-		if (SERVICE != null) SERVICE.shutdown();
 	}
 }

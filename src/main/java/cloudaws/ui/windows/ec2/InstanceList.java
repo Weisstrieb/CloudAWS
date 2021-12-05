@@ -1,9 +1,11 @@
 package cloudaws.ui.windows.ec2;
 
 import cloudaws.Main;
+import cloudaws.concurrent.Binding;
 import cloudaws.ec2.EC2Util;
 import cloudaws.ui.windows.WindowConstruction;
 import com.amazonaws.services.ec2.model.Instance;
+import com.amazonaws.services.ec2.model.InstanceState;
 import com.googlecode.lanterna.SGR;
 import com.googlecode.lanterna.TerminalSize;
 import com.googlecode.lanterna.TextColor;
@@ -19,12 +21,9 @@ public class InstanceList extends WindowConstruction {
 
 	private static final int DEFAULT_WIDTH = 50;
 	private static final int DEFAULT_HEIGHT = 10;
-	private static final int RELOAD_DELAY = 1000;
-
-	private final Timer asyncTimer = new Timer();
 
 	private CompletableFuture<List<Instance>> future;
-	private List<Instance> instances;
+	private final Binding<List<Instance>> instances;
 	private String lastFocusd = "";
 
 	private Panel panel, pending;
@@ -34,7 +33,10 @@ public class InstanceList extends WindowConstruction {
 
 	public InstanceList(String title) {
 		super(title);
-		registerAsyncHook();
+		this.instances = new Binding<>(Main.EC2::getInstances, this::fail, 1000)
+				.withDefault(Collections.emptyList())
+				.withNotifier(this, this::updateInstances);
+		this.instances.start();
 	}
 
 	@Override
@@ -85,42 +87,15 @@ public class InstanceList extends WindowConstruction {
 			future.cancel(true);
 			future = null;
 		}
-		if (instances != null) instances.clear();
-		if (asyncTimer != null) asyncTimer.cancel();
+		if (instances != null) {
+			instances.stop();
+			instances.clear();
+		}
 
 		this.close();
 	}
 
-	public void registerAsyncHook() {
-		asyncTimer.scheduleAtFixedRate(new TimerTask() {
-			@Override
-			public void run() {
-				Main.EC2.getInstances().thenAccept(result -> {
-					synchronized (this) {
-						instances = result;
-					}
-				});
-			}
-		}, 0, RELOAD_DELAY);
-	}
-
-	public void loadAsync() {
-		future = Main.EC2.getInstances();
-		future.thenAccept(result -> {
-			synchronized (this) {
-				instances = result;
-				this.updateInstance();
-			}
-		}).exceptionally(exception -> {
-			synchronized (this) {
-				instances = Collections.emptyList();
-				this.fail(exception);
-			}
-			return null;
-		});
-	}
-
-	private void updateInstance() {
+	private void updateInstances(List<Instance> instances) {
 		if (!getTitle().equals(DEFAULT_TITLE)) this.setTitle(DEFAULT_TITLE);
 		panel.removeAllComponents();
 
@@ -136,12 +111,24 @@ public class InstanceList extends WindowConstruction {
 				}
 
 				pool.addItem(field, () -> {
-					System.out.println(instance);
 					lastFocusd = instance.getInstanceId();
 					InstanceModal modal = new InstanceModal(instance);
-					getTextGUI().addWindowAndWait(modal);
 
-					this.updateInstance();
+					this.instances.pause(this);
+					this.instances.bind(modal, list -> {
+						Optional<Instance> updated = list.stream().filter(i -> i.getInstanceId().equals(modal.instance.getInstanceId())).findFirst();
+						if (updated.isPresent()) {
+							modal.instance = updated.get();
+							modal.updateState(updated.get().getState());
+						}
+						else {
+							modal.updateState(null);
+						}
+					});
+					getTextGUI().addWindowAndWait(modal);
+					this.instances.unbind(modal);
+
+					this.updateInstances(this.instances.get());
 				});
 			});
 
@@ -165,9 +152,12 @@ public class InstanceList extends WindowConstruction {
 
 		panel.addComponent(new EmptySpace(TerminalSize.ONE));
 		panel.addComponent(closeButton);
+
+		// Run only once.
+		this.instances.pause(this);
 	}
 
-	private void fail(Throwable error) {
+	private boolean fail(Throwable error) {
 		this.setTitle("Loading Failed");
 		panel.removeComponent(pending);
 
@@ -177,12 +167,17 @@ public class InstanceList extends WindowConstruction {
 		).setPreferredSize(new TerminalSize(DEFAULT_WIDTH, 3));
 		panel.addComponent(0, msg);
 		panel.addComponent(1, new EmptySpace(TerminalSize.ONE));
+
+		return false;
 	}
 
 	public static class InstanceModal extends AbstractWindow {
-		private final Instance instance;
-		private final Panel mainPanel;
+		private Instance instance;
 
+		private final Panel mainPanel;
+		private Border addressBoard;
+
+		private final Label stateLabel;
 		private static final Map<Integer, TextColor> COLOR_MAP = new HashMap<>();
 		static {
 			// 0: Pending
@@ -204,36 +199,35 @@ public class InstanceList extends WindowConstruction {
 			this.instance = instance;
 			this.mainPanel = new Panel();
 
+			this.stateLabel = new Label("● " + instance.getState().getName());
+			TextColor color = COLOR_MAP.getOrDefault(instance.getState().getCode(), TextColor.ANSI.DEFAULT);
+			this.stateLabel.setForegroundColor(color);
+
 			buildComponents();
 		}
 
-		protected void buildComponents() {
+		private void buildComponents() {
 			this.setHints(Collections.singletonList(Hint.CENTERED));
 			mainPanel.setLayoutManager(new GridLayout(1));
 
-			Panel infoPanel = new Panel();
-			infoPanel.setLayoutManager(
-					new GridLayout(2)
-							.setLeftMarginSize(1)
-							.setRightMarginSize(1)
-			);
+			Panel inner = new Panel().setLayoutManager(new LinearLayout(Direction.HORIZONTAL));
 
-			String name = EC2Util.getInstanceName(instance);
-			if (!name.equals("")) printField(infoPanel, "Name", name);
-			printField(infoPanel, "Instance ID", instance.getInstanceId());
-			printField(infoPanel, "AMI Image", instance.getImageId());
-			printField(infoPanel, "Arch", instance.getArchitecture());
+			Panel infoPanel = buildInfoPanel();
+			Panel statePanel = buildStatePanel();
 
-			Label state = new Label("● " + instance.getState().getName());
-			TextColor color = COLOR_MAP.getOrDefault(instance.getState().getCode(), TextColor.ANSI.DEFAULT);
-			state.setForegroundColor(color);
+			inner.addComponent(statePanel.withBorder(Borders.doubleLine("Status")));
+			inner.addComponent(infoPanel.withBorder(Borders.singleLine("General Info.")));
 
-			infoPanel.addComponent(state);
-			infoPanel.addComponent(new EmptySpace(TerminalSize.ONE));
+			mainPanel.addComponent(inner);
+			// An instance is running (code: 16)
+			if (instance.getState().getCode() == 16) {
+				Panel addressPanel = buildAddressPanel();
+				addressBoard = addressPanel.withBorder(Borders.singleLine("Address Info."));
 
-			mainPanel.addComponent(infoPanel);
+				mainPanel.addComponent(addressBoard);
+			}
+
 			mainPanel.addComponent(new EmptySpace(TerminalSize.ONE));
-
 			mainPanel.addComponent(new Button(LocalizedString.Close.toString(), this::close).setLayoutData(
 					GridLayout.createLayoutData(
 							GridLayout.Alignment.END,
@@ -245,20 +239,98 @@ public class InstanceList extends WindowConstruction {
 			this.setComponent(mainPanel);
 		}
 
+		private Panel buildInfoPanel() {
+			Panel panel = new Panel();
+			panel.setLayoutManager(
+					new GridLayout(2)
+							.setLeftMarginSize(1)
+							.setRightMarginSize(1)
+			);
+
+			String name = EC2Util.getInstanceName(instance);
+			if (!name.equals("")) printField(panel, "Name", name);
+			printField(panel, "Instance ID", instance.getInstanceId());
+			printField(panel, "AMI Image", instance.getImageId());
+			printField(panel, "Arch", instance.getArchitecture());
+			printField(panel, "Type", instance.getInstanceType());
+			printField(panel, "Region", instance.getPlacement().getAvailabilityZone());
+
+			return panel;
+		}
+
+		private Panel buildAddressPanel() {
+			Panel panel = new Panel();
+			panel.setLayoutManager(
+					new GridLayout(2)
+							.setLeftMarginSize(1)
+							.setRightMarginSize(1)
+			);
+
+			printField(panel,"Public IPv4", instance.getPublicIpAddress(), false);
+			printField(panel, "Public DNS", instance.getPublicDnsName(), true);
+
+			return panel;
+		}
+
+		private Panel buildStatePanel() {
+			Panel panel = new Panel();
+			panel.setLayoutManager(
+					new GridLayout(2)
+							.setLeftMarginSize(1)
+							.setRightMarginSize(1)
+			);
+			panel.addComponent(this.stateLabel);
+			panel.addComponent(new EmptySpace(TerminalSize.ONE));
+
+			return panel;
+		}
+
+		public void updateState(InstanceState newState) {
+			if (newState != null) {
+				this.stateLabel.setText("● " + newState.getName());
+				TextColor color = COLOR_MAP.getOrDefault(newState.getCode(), TextColor.ANSI.DEFAULT);
+				this.stateLabel.setForegroundColor(color);
+
+				if (mainPanel.containsComponent(addressBoard)) {
+					if (newState.getCode() != 16) {
+						mainPanel.removeComponent(addressBoard);
+					}
+				}
+				else if (newState.getCode() == 16) {
+					if (addressBoard == null) {
+						addressBoard = buildAddressPanel().withBorder(Borders.singleLine("Address Info."));
+					}
+					mainPanel.addComponent(1, addressBoard);
+				}
+			}
+			else {
+				this.stateLabel.setText("● -");
+				this.stateLabel.setForegroundColor(TextColor.ANSI.DEFAULT);
+			}
+		}
+
 		private void printField(Panel panel, String key, String value) {
+			printField(panel, key, value, false);
+		}
+
+		private void printField(Panel panel, String key, String value, boolean linebreak) {
 			Label keyLabel = new Label("- " + key).addStyle(SGR.BOLD);
 			keyLabel.setLayoutData(GridLayout.createLayoutData(
 					GridLayout.Alignment.BEGINNING,
 					GridLayout.Alignment.BEGINNING,
 					true,
-					false
+					false,
+					linebreak ? 2 : 1,
+					1
 			));
 			Label valLabel = new Label(value);
 			valLabel.setLayoutData(GridLayout.createLayoutData(
 					GridLayout.Alignment.BEGINNING,
 					GridLayout.Alignment.BEGINNING,
 					true,
-					false
+					false,
+					linebreak ? 2 : 1,
+					1
 			));
 
 			panel.addComponent(keyLabel);

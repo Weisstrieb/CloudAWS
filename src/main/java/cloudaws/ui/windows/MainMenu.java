@@ -37,7 +37,6 @@ public class MainMenu extends WindowConstruction {
 		).addTo(panel);
 		panel.addComponent(new EmptySpace(TerminalSize.ONE));
 
-		// Panel buttonPanel = new Panel();
 		Button closeButton = new Button("Exit", this::close)
 				.setLayoutData(GridLayout.createLayoutData(
 						GridLayout.Alignment.CENTER,
@@ -56,7 +55,6 @@ public class MainMenu extends WindowConstruction {
 
 		menus.put("Instance Management", () -> {
 			InstanceList list = new InstanceList();
-			list.loadAsync();
 			getTextGUI().addWindowAndWait(list);
 		});
 
