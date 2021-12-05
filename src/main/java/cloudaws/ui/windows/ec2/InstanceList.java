@@ -10,9 +10,12 @@ import com.googlecode.lanterna.SGR;
 import com.googlecode.lanterna.TerminalSize;
 import com.googlecode.lanterna.TextColor;
 import com.googlecode.lanterna.gui2.*;
+import com.googlecode.lanterna.gui2.dialogs.MessageDialogBuilder;
+import com.googlecode.lanterna.gui2.dialogs.MessageDialogButton;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.BiFunction;
 import java.util.stream.IntStream;
 
 public class InstanceList extends WindowConstruction {
@@ -21,6 +24,7 @@ public class InstanceList extends WindowConstruction {
 
 	private static final int DEFAULT_WIDTH = 50;
 	private static final int DEFAULT_HEIGHT = 10;
+	private static final int RELOAD_DELAY = 1000;
 
 	private CompletableFuture<List<Instance>> future;
 	private final Binding<List<Instance>> instances;
@@ -33,7 +37,7 @@ public class InstanceList extends WindowConstruction {
 
 	public InstanceList(String title) {
 		super(title);
-		this.instances = new Binding<>(Main.EC2::getInstances, this::fail, 1000)
+		this.instances = new Binding<>(Main.EC2::getInstances, this::fail, RELOAD_DELAY)
 				.withDefault(Collections.emptyList())
 				.withNotifier(this, this::updateInstances);
 		this.instances.start();
@@ -178,6 +182,7 @@ public class InstanceList extends WindowConstruction {
 		private Border addressBoard;
 
 		private final Label stateLabel;
+
 		private static final Map<Integer, TextColor> COLOR_MAP = new HashMap<>();
 		static {
 			// 0: Pending
@@ -228,6 +233,14 @@ public class InstanceList extends WindowConstruction {
 			}
 
 			mainPanel.addComponent(new EmptySpace(TerminalSize.ONE));
+			mainPanel.addComponent(buildButtons().setLayoutData(
+					GridLayout.createLayoutData(
+							GridLayout.Alignment.CENTER,
+							GridLayout.Alignment.CENTER,
+							true,
+							false
+					)
+			));
 			mainPanel.addComponent(new Button(LocalizedString.Close.toString(), this::close).setLayoutData(
 					GridLayout.createLayoutData(
 							GridLayout.Alignment.END,
@@ -281,6 +294,64 @@ public class InstanceList extends WindowConstruction {
 			);
 			panel.addComponent(this.stateLabel);
 			panel.addComponent(new EmptySpace(TerminalSize.ONE));
+
+			return panel;
+		}
+
+		private Panel buildButtons() {
+			Panel panel = new Panel();
+			panel.setLayoutManager(
+					new GridLayout(3).setHorizontalSpacing(5)
+			);
+
+			BiFunction<String, Runnable, Button> factory = (label, action) -> {
+				return new Button(label, action)
+						.setLayoutData(GridLayout.createLayoutData(
+								GridLayout.Alignment.CENTER,
+								GridLayout.Alignment.CENTER,
+								true,
+								false
+						));
+			};
+			MessageDialogBuilder builder = new MessageDialogBuilder()
+					.setTitle("")
+					.addButton(MessageDialogButton.Yes)
+					.addButton(MessageDialogButton.No);
+
+			Button start = factory.apply("Start", () -> {
+				if (this.instance.getState().getCode() != 80) return;
+				MessageDialogButton answer = builder.setTitle("Confirm start")
+						.setText("  Start this instance?  ")
+						.build()
+						.showDialog(getTextGUI());
+
+				if (answer == MessageDialogButton.Yes)
+					Main.EC2.startInstance(instance.getInstanceId());
+			});
+			Button stop = factory.apply("Stop", () -> {
+				if (this.instance.getState().getCode() != 16) return;
+				MessageDialogButton answer = builder.setTitle("Confirm stop")
+						.setText("  Stop this instance?  ")
+						.build()
+						.showDialog(getTextGUI());
+
+				if (answer == MessageDialogButton.Yes)
+					Main.EC2.stopInstance(instance.getInstanceId());
+			});
+			Button reboot = factory.apply("Reboot", () -> {
+				if (this.instance.getState().getCode() != 16) return;
+				MessageDialogButton answer = builder.setTitle("Confirm reboot")
+						.setText("  Reboot this instance?  ")
+						.build()
+						.showDialog(getTextGUI());
+
+				if (answer == MessageDialogButton.Yes)
+					Main.EC2.rebootInstance(instance.getInstanceId());
+			});
+
+			panel.addComponent(start);
+			panel.addComponent(stop);
+			panel.addComponent(reboot);
 
 			return panel;
 		}
