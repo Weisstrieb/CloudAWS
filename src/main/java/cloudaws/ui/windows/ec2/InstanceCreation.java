@@ -132,8 +132,8 @@ public class InstanceCreation extends PendingWindow {
 						.withKeyName(cKeys.getSelectedItem())
 						.withSecurityGroupIds(aSecurityGroups.get(cGroups.getSelectedIndex()).getGroupId());
 
+				Main.EC2.createInstance(request);
 				requested = true;
-				// Main.EC2.createInstance(request);
 				this.close();
 			}
 		}).setLayoutData(
