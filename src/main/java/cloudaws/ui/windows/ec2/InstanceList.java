@@ -2,7 +2,7 @@ package cloudaws.ui.windows.ec2;
 
 import cloudaws.Main;
 import cloudaws.concurrent.Binding;
-import cloudaws.ec2.EC2Util;
+import cloudaws.ec2.EC2Utils;
 import cloudaws.ui.windows.PendingWindow;
 
 import com.amazonaws.services.ec2.model.Instance;
@@ -67,7 +67,7 @@ public class InstanceList extends PendingWindow {
 				.collect(Collectors.toList()) : Collections.emptyList()
 		);
 		instances.sort((i1, i2) -> {
-			String n1 = EC2Util.getInstanceName(i1), n2 = EC2Util.getInstanceName(i2);
+			String n1 = EC2Utils.getInstanceName(i1), n2 = EC2Utils.getInstanceName(i2);
 			if (n1.equals("") == n2.equals("")) {
 				return n1.compareTo(n2);
 			}
@@ -79,7 +79,7 @@ public class InstanceList extends PendingWindow {
 		String[] zoneInfo = (instances.size() > 0) ?
 				instances.get(0).getPlacement().getAvailabilityZone().split("-") :
 				Main.EC2().getCurrentRegion().split("-");
-		String region = String.format("[%s-%s]", zoneInfo[0], zoneInfo[1]);
+		String region = String.format("[%s-%s-%c]", zoneInfo[0], zoneInfo[1], zoneInfo[2].charAt(0));
 
 		panel.addComponent(new Label(region).addStyle(SGR.BOLD).setLayoutData(
 				GridLayout.createLayoutData(
@@ -94,7 +94,7 @@ public class InstanceList extends PendingWindow {
 		if (instances.size() > 0) {
 			ActionListBox pool = new ActionListBox(new TerminalSize(DEFAULT_WIDTH, Math.min(instances.size() + 1, DEFAULT_HEIGHT)));
 			instances.forEach(instance -> {
-				String name = EC2Util.getInstanceName(instance), field;
+				String name = EC2Utils.getInstanceName(instance), field;
 				if (!name.equals("")) {
 					field = String.format("▶ %s (%s)", name, instance.getInstanceId());
 				}
@@ -159,6 +159,7 @@ public class InstanceList extends PendingWindow {
 				)
 			);
 			panel.addComponent(newInstance);
+			newInstance.takeFocus();
 		}
 
 		panel.addComponent(new EmptySpace(TerminalSize.ONE));
@@ -283,7 +284,7 @@ public class InstanceList extends PendingWindow {
 							.setRightMarginSize(1)
 			);
 
-			String name = EC2Util.getInstanceName(instance);
+			String name = EC2Utils.getInstanceName(instance);
 			if (!name.equals("")) printField(panel, "Name", name);
 			printField(panel, "Instance ID", instance.getInstanceId());
 			printField(panel, "AMI Image", instance.getImageId());

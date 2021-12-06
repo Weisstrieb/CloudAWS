@@ -1,6 +1,7 @@
 package cloudaws.ui.windows;
 
 import cloudaws.ui.windows.ec2.ChangeRegion;
+import cloudaws.ui.windows.ec2.CondorStatus;
 import cloudaws.ui.windows.ec2.InstanceList;
 import com.googlecode.lanterna.TerminalSize;
 import com.googlecode.lanterna.gui2.*;
@@ -53,8 +54,7 @@ public class MainMenu extends WindowConstruction {
 		Map<String, Runnable> menus = new LinkedHashMap<>();
 
 		menus.put("Instance Management", () -> {
-			InstanceList list = new InstanceList();
-			getTextGUI().addWindowAndWait(list);
+			getTextGUI().addWindowAndWait(new InstanceList());
 		});
 
 		menus.put("Regions", () -> {
@@ -63,7 +63,9 @@ public class MainMenu extends WindowConstruction {
 
 		// menus.put("Security Group", () -> {});
 
-		menus.put("HTCondor Status", () -> {});
+		menus.put("HTCondor Status", () -> {
+			getTextGUI().addWindowAndWait(new CondorStatus());
+		});
 
 		return menus;
 	}

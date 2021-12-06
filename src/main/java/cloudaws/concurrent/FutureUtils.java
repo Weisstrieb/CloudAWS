@@ -5,7 +5,7 @@ import cloudaws.Main;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-public class FutureUtil {
+public class FutureUtils {
 	static final ScheduledExecutorService SERVICE = Main.PROMISE_POOL;
 	static long ENQUEUE_DELAY = 1;
 

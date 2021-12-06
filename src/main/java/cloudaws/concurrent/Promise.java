@@ -20,7 +20,7 @@ public class Promise<T> extends CompletableFuture<T> {
 		this.timeout = Math.max(1, timeout);
 		this.enqueued = System.currentTimeMillis();
 
-		FutureUtil.enqueue(this::loop);
+		FutureUtils.enqueue(this::loop);
 	}
 
 	private void loop() {
@@ -39,7 +39,7 @@ public class Promise<T> extends CompletableFuture<T> {
 		}
 		else {
 			if (System.currentTimeMillis() - enqueued < timeout) {
-				FutureUtil.enqueue(this::loop);
+				FutureUtils.enqueue(this::loop);
 			}
 			else {
 				completeExceptionally(new TimeoutException("Future timed out: " + future));

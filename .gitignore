@@ -9,3 +9,5 @@ build
 gradlew*
 
 libs
+
+*.pem

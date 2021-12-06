@@ -1,7 +1,9 @@
 package cloudaws;
 
 import cloudaws.ec2.EC2Manager;
+import cloudaws.ssh.EC2SecureShell;
 import cloudaws.ui.MainScreen;
+import com.jcraft.jsch.JSchException;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
