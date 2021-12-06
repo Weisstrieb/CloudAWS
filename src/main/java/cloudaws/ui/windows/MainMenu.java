@@ -57,11 +57,9 @@ public class MainMenu extends WindowConstruction {
 			getTextGUI().addWindowAndWait(new InstanceList());
 		});
 
-		menus.put("Regions", () -> {
+		menus.put("Change Regions", () -> {
 			getTextGUI().addWindowAndWait(new ChangeRegion());
 		});
-
-		// menus.put("Security Group", () -> {});
 
 		menus.put("HTCondor Status", () -> {
 			getTextGUI().addWindowAndWait(new CondorStatus());
