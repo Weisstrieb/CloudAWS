@@ -86,15 +86,22 @@ public class InstanceCreation extends PendingWindow {
 		cImages = new ComboBox<>(this.aImages.stream().map(Image::getName).collect(Collectors.toList()))
 				.setReadOnly(true)
 				.setLayoutData(right);
+		if (this.aImages.isEmpty()) cImages.setEnabled(false);
+
 		cZones = new ComboBox<>(this.aZones.stream().map(AvailabilityZone::getZoneName).collect(Collectors.toList()))
 				.setReadOnly(true)
 				.setLayoutData(right);
+		if (this.aZones.isEmpty()) cZones.setEnabled(false);
+
 		cKeys = new ComboBox<>(this.aKeys)
 				.setReadOnly(true)
 				.setLayoutData(right);
+		if (this.aKeys.isEmpty()) cKeys.setEnabled(false);
+
 		cGroups = new ComboBox<>(this.aSecurityGroups.stream().map(SecurityGroup::getGroupName).collect(Collectors.toList()))
 				.setReadOnly(true)
 				.setLayoutData(right);
+		if (this.aSecurityGroups.isEmpty()) cGroups.setEnabled(false);
 
 		addField("Image", cImages);
 		addField("Zone", cZones);
@@ -107,6 +114,20 @@ public class InstanceCreation extends PendingWindow {
 				new MessageDialogBuilder()
 						.setTitle("Invalid name")
 						.setText("  The name of instance must be provided.  ")
+						.addButton(MessageDialogButton.Close)
+						.build()
+						.showDialog(getTextGUI());
+				return;
+			}
+			if (
+					aImages.isEmpty()   ||
+					aKeys.isEmpty()     ||
+					aZones.isEmpty()    ||
+					aSecurityGroups.isEmpty()
+			) {
+				new MessageDialogBuilder()
+						.setTitle("Invalid form")
+						.setText("  The options required are not completely determined.  ")
 						.addButton(MessageDialogButton.Close)
 						.build()
 						.showDialog(getTextGUI());

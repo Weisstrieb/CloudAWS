@@ -29,6 +29,9 @@ public class ChangeRegion extends PendingWindow {
 		Main.EC2().availableRegions().thenAccept(res -> {
 			this.regions = res;
 			this.updatePanel();
+		}).exceptionally(err -> {
+			this.fail(err);
+			return null;
 		});
 	}
 
@@ -57,6 +60,19 @@ public class ChangeRegion extends PendingWindow {
 		panel.addComponent(closeButton);
 
 		cRegions.takeFocus();
+	}
+
+	private void fail(Throwable error) {
+		this.setTitle("Loading Failed");
+		panel.removeComponent(pending);
+
+		System.err.println(error.getMessage());
+		Label msg = new Label(
+				" Failed to load available regions from AWS.\nMake sure that your PC is connected to network\nand AWS access key is valid."
+		).setPreferredSize(new TerminalSize(DEFAULT_WIDTH, 3));
+		panel.addComponent(0, msg);
+		panel.addComponent(1, new EmptySpace(TerminalSize.ONE));
+
 	}
 
 	@Override

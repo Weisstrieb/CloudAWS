@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeoutException;
 
 public class EC2SecureShell {
 
@@ -55,36 +56,66 @@ public class EC2SecureShell {
 	}
 
 	public CompletableFuture<List<String>> getSSHResponse(String command) {
-		return this.getSSHResponse("", command);
+		return this.getSSHResponse("", command, 5 * SECOND);
 	}
 
 	public CompletableFuture<List<String>> getSSHResponse(String srcDir, String command) {
-		Future<List<String>> future = Main.PROMISE_POOL.submit(() -> {
-			List<String> result = new ArrayList<>();
+		return this.getSSHResponse(srcDir, command, 5 * SECOND);
+	}
+
+	public CompletableFuture<List<String>> getSSHResponse(String command, long timeout) {
+		return this.getSSHResponse("", command, timeout);
+	}
+
+	public CompletableFuture<List<String>> getSSHResponse(String srcDir, String command, long timeout) {
+		CompletableFuture<List<String>> future = new CompletableFuture<>();
+		Main.PROMISE_POOL.submit(() -> {
+			ChannelExec channel = null;
+			InputStream stream = null;
+
 			try {
-				connect();
-				ChannelExec channel = (ChannelExec) session.openChannel("exec");
+				this.connect();
+				if (srcDir.length() > 0) {
+					channel = (ChannelExec) session.openChannel("exec");
+					channel.setCommand("cd " + srcDir);
+
+					channel.connect();
+					channel.disconnect();
+					channel = null;
+				}
+
+				channel = (ChannelExec) session.openChannel("exec");
 				channel.setCommand(command);
 
-				InputStream stream = channel.getInputStream();
+				stream = channel.getInputStream();
 				channel.connect();
+
+				Thread.sleep(timeout);
+				if (stream.available() == 0) {
+					future.completeExceptionally(new TimeoutException("Failed to fetch HTCondor status from server."));
+					return false;
+				}
 
 				StringBuilder response = new StringBuilder();
 				int len;
 				while ((len = stream.read(buffer, 0, buffer.length)) > 0) {
 					response.append(new String(buffer, 0, len));
 				}
-				return Arrays.asList(response.toString().split("\n"));
+
+				future.complete(Arrays.asList(response.toString().split("\n")));
+				return true;
 			} catch (JSchException | IOException ex) {
 				System.err.println("SSH Connection error occurred.");
-				ex.printStackTrace();
+				future.completeExceptionally(ex);
 			} finally {
-				disconnect();
+				if (channel != null) channel.disconnect();
+				if (stream != null) stream.close();
+				this.disconnect();
 			}
-			return result;
+			return false;
 		});
 
-		return new Promise<>(future, 10 * SECOND);
+		return new Promise<>(future, 5 * SECOND);
 	}
 
 	public void disconnect() {

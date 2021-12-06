@@ -55,6 +55,9 @@ public class CondorStatus extends PendingWindow {
 			});
 
 			this.updatePanel();
+		}).exceptionally(err -> {
+			this.fail(err);
+			return null;
 		});
 	}
 
@@ -88,13 +91,12 @@ public class CondorStatus extends PendingWindow {
 	}
 
 	public void connect() {
-
 		try {
 			EC2SecureShell shell = new EC2SecureShell(
 					instances.get(collector.getSelectedIndex()).getPublicDnsName(),
 					this.pem
 			);
-			StatusModal modal = new StatusModal(shell.getSSHResponse(COMMAND));
+			StatusModal modal = new StatusModal(shell.getSSHResponse(COMMAND, 3000));
 			getTextGUI().addWindowAndWait(modal);
 
 		} catch (JSchException ex) {
@@ -188,6 +190,18 @@ public class CondorStatus extends PendingWindow {
 		panel.addComponent(buttonPanel);
 	}
 
+	private void fail(Throwable error) {
+		this.setTitle("Loading Failed");
+		panel.removeComponent(pending);
+
+		System.err.println(error.getMessage());
+		Label msg = new Label(
+				" Failed to load EC2 instances from AWS.\nMake sure that your PC is connected to network\nand AWS access key is valid."
+		).setPreferredSize(new TerminalSize(DEFAULT_WIDTH, 3));
+		panel.addComponent(0, msg);
+		panel.addComponent(1, new EmptySpace(TerminalSize.ONE));
+	}
+
 	public static class StatusModal extends PendingWindow {
 
 		private CompletableFuture<List<String>> future;
@@ -248,11 +262,11 @@ public class CondorStatus extends PendingWindow {
 			error.printStackTrace();
 			panel.removeAllComponents();
 
-			this.setTitle("Connection failed");
+			this.setTitle("Connection Failed");
 
 			Label msg = new Label(
-					" Failed to establish SSH connection to the collector instance. "
-			).setPreferredSize(new TerminalSize(DEFAULT_WIDTH, 3));
+					" Failed to establish SSH connection to the collector instance.\n Check your network connection and the key file, and there must be at least one instance with collector daemon that is running."
+			).setPreferredSize(new TerminalSize(60, 6));
 
 			panel.addComponent(msg);
 			panel.addComponent(closeButton);
